@@ -100,11 +100,9 @@ tsl = Tradehull(client_code, token_id)
 
 2. **Fetch Historical Data**
 
-   Retrieve historical:
-
    *Get Historical Data*
    
-      - tsl.get_historical_data(tradingsymbol: str, exchange: str, timeframe: str, debug: str = "NO")
+      - tsl.get_historical_data(tradingsymbol: str, exchange: str, timeframe: str, sector: str = "NO", debug: str = "NO")
 
          - Arguments:
             - tradingsymbol (str): The trading symbol for the instrument you want to fetch data for (e.g., 'NIFTY', 'ACC').
@@ -116,13 +114,43 @@ tsl = Tradehull(client_code, token_id)
                - '25' for 25-minute candles
                - '60' for 60-minute candles
                - 'DAY' for daily candles
+            - sector (optional, str): Set to "YES" to fetch sector data(e.g., 'Nifty Healthcare', 'NIFTY 100'). Default is "NO".
             - debug (optional, str): Set to "YES" to enable detailed API response logging. Default is "NO".
          
          - Sample Code:
             ```python
                data = tsl.get_historical_data(tradingsymbol='NIFTY', exchange='INDEX', timeframe="DAY")
                data = tsl.get_historical_data(tradingsymbol='ACC', exchange='NSE', timeframe="1")
+               # sector data
+               data = tsl.get_historical_data(tradingsymbol="NIFTY 100", exchange="NSE", timeframe="DAY", sector="YES")
             ```
+
+   *Get Long-Term Historical Data*
+
+      - tsl.get_long_term_historical_data(tradingsymbol: str, exchange: str, timeframe: str, from_date: str, to_date: str, sector: str = "NO", debug: str = "NO")
+
+      - Arguments:
+         - tradingsymbol (str): The trading symbol for the instrument you want to fetch data for (e.g., 'RELIANCE', 'NIFTY', 'CRUDEOIL').
+         - exchange (str): The exchange where the instrument is traded (e.g., 'NSE', 'INDEX', 'MCX').
+         - timeframe (str): The timeframe for the data. It can be:
+            - '1' for 1-minute candles
+            - '5' for 5-minute candles
+            - '15' for 15-minute candles
+            - '25' for 25-minute candles
+            - '60' for 60-minute candles
+            - 'DAY' for daily candles
+         - from_date (str): Start date for fetching data (format: YYYY-MM-DD).
+         - to_date (str): End date for fetching data (format: YYYY-MM-DD).
+         - sector (optional, str): Set to "YES" to fetch sector data(e.g., 'Nifty Healthcare', 'NIFTY 100'). Default is "NO".
+         - debug (optional, str): Set to "YES" to enable detailed API response logging. Default is "NO".
+
+      - Sample Code:
+         ```python
+         data = tsl.get_long_term_historical_data(tradingsymbol='RELIANCE',exchange='NSE',timeframe='5',from_date='2021-01-01',to_date='2025-10-17')
+         # sector data
+         data = tsl.get_long_term_historical_data(tradingsymbol="NIFTY 100", exchange="NSE", timeframe="5", from_date="2022-01-01", to_date="2025-12-03", sector="YES")
+         
+         ```
 
 
 3. **Option Strike Selection**
@@ -147,7 +175,7 @@ tsl = Tradehull(client_code, token_id)
 
       - Sample Code:         
          ```python      
-            CE_symbol_name, PE_symbol_name, strike_price = tsl.ATM_Strike_Selection(Underlying='NIFTY', Expiry=0)
+            CE_symbol_name, PE_symbol_name, strike = tsl.ATM_Strike_Selection(Underlying='NIFTY', Expiry=0)
          ```
       
 
@@ -167,12 +195,12 @@ tsl = Tradehull(client_code, token_id)
       - Returns:
          - CE_symbol_name (str): The option symbol for the OTM Call strike.
          - PE_symbol_name (str): The option symbol for the OTM Put strike.
-         - CE_OTM_price (int): The OTM Call strike price.
-         - PE_OTM_price (int): The OTM Put strike price.
+         - CE_strike (int): The OTM Call strike price.
+         - PE_strike (int): The OTM Put strike price.
 
       - Sample Code:         
          ```python      
-            CE_symbol_name, PE_symbol_name, CE_OTM_price, PE_OTM_price = tsl.OTM_Strike_Selection(Underlying='NIFTY', Expiry=0, OTM_count=5)
+            CE_symbol_name, PE_symbol_name, CE_strike, PE_strike = tsl.OTM_Strike_Selection(Underlying='NIFTY', Expiry=0, OTM_count=5)
          ```      
 
    
@@ -192,12 +220,12 @@ tsl = Tradehull(client_code, token_id)
       - Returns:
          - CE_symbol_name (str): The option symbol for the ITM Call strike.
          - PE_symbol_name (str): The option symbol for the ITM Put strike.
-         - CE_ITM_price (int): The ITM Call strike price.
-         - PE_ITM_price (int): The ITM Put strike price.
+         - CE_strike (int): The ITM Call strike price.
+         - PE_strike (int): The ITM Put strike price.
       
       - Sample Code:         
          ```python      
-            CE_symbol_name, PE_symbol_name, CE_ITM_price, PE_ITM_price = tsl.ITM_Strike_Selection(Underlying='NIFTY', Expiry=0, ITM_count=1)
+            CE_symbol_name, PE_symbol_name, CE_strike, PE_strike = tsl.ITM_Strike_Selection(Underlying='NIFTY', Expiry=0, ITM_count=1)
          ```     
 
 ---
@@ -638,8 +666,110 @@ tsl = Tradehull(client_code, token_id)
 
 ---
 
+8. **Fetch Expired Option Chart Data**
 
-8. **Alerts via Telegram**
+   Retrieve minute-wise OHLC, Volume, IV, OI, Spot, and Strike data for expired option contracts (index options only, as supported by DHAN).
+
+   *Get Expired Option Data*
+
+      - tsl.get_expired_option_data(tradingsymbol: str,exchange: str,interval: int,expiry_flag: str,expiry_code: int,strike: str = "ATM",option_type: str = "CALL",required_data: list = None,from_date: str = "",to_date: str = "")
+
+
+      - Arguments:
+         - tradingsymbol (str): The symbol for which historical expired option data is required  
+            (e.g., `"NIFTY"`, `"BANKNIFTY"`, `"RELIANCE"`).
+         - exchange (str): Exchange of the underlying  
+            Allowed: `"NSE"`, `"BSE"`
+         - interval (int): Candle interval in minutes  
+            Allowed: `1`, `5`, `15`, `25`, `60`.
+         - expiry_flag (str): The expiry type  
+            - `"MONTH"` for monthly contracts  
+            - `"WEEK"` for weekly contracts
+         - expiry_code (int): Expiry sequence number  
+            - `1` → Near expiry  
+            - `2` → Next expiry  
+            - `3` → Far expiry
+         - strike (str): Strike selection mode  
+            Examples: `"ATM"`, `"ATM+3"`, `"ATM-3"`.
+         - option_type (str): `"CALL"` or `"PUT"`.
+         - required_data (list, optional): Which fields to fetch  
+            Default: `["open","high","low","close","volume","iv","oi","spot","strike"]`
+         - from_date (str): Start date in `YYYY-MM-DD` format.
+         - to_date (str): End date in `YYYY-MM-DD` format.
+
+   - Sample Code:
+      ```python
+      data = tsl.get_expired_option_data(tradingsymbol="RELIANCE",exchange="NSE",interval=1,expiry_flag="MONTH",expiry_code=1,strike="ATM",option_type="CALL",from_date="2024-10-10",to_date="2024-11-10")
+      ```
+---
+
+9. **Full Market Depth Data**
+
+   Retrieve live 20-level bid/ask orderbook depth for NSE and BSE instruments
+
+   *Get Market Depth Data*
+   
+      - tsl.full_market_depth_data(symbols)
+
+         - Arguments:
+            - symbols with exchanges(tuple or list of tuples): Instrument(s) for which you want full market depth
+               - Single symbol example:
+                  - ("RELIANCE", "NSE")
+               - Multiple symbols example:
+                  - [
+                        ("RELIANCE", "NSE"),
+                        ("SENSEX 11 DEC 85800 CALL", "BFO"),
+                        ("NIFTY 09 DEC 26000 CALL", "NFO"),
+                        ("NIFTY 09 DEC 26000 PUT", "NFO"),
+                    ]
+
+         - Returns:
+            - For a single symbol:
+               - A single depth client object (to be passed to get_market_depth_df)
+            - For multiple symbols:
+               - A dictionary in the format:
+                 - "RELIANCE|NSE" → <depth_client>
+                 - "NIFTY 09 DEC 26000 CALL|NFO" → <depth_client>
+
+   *Parse Market Depth into DataFrames*
+   
+      - tsl.get_market_depth_df(depth_client)
+
+         - Returns:
+            - bid_df: Bid side DataFrame
+            - ask_df: Ask side DataFrame
+
+         - Columns in DataFrames:
+            - level - depth level
+            - bid_price, bid_qty, bid_orders
+            - ask_price, ask_qty, ask_orders
+
+   *Sample Code*
+   
+   ```python
+   # Single Symbol
+   depth_client = tsl.full_market_depth_data(("RELIANCE", "NSE"))
+
+   for key, depth_client in depth_data.items():
+      bid_df, ask_df = tsl.get_market_depth_df(depth_client)
+   ```
+
+   ```python
+   # Multiple Symbols
+   symbol_list = [
+    ("RELIANCE", "NSE"),
+    ("SENSEX 11 DEC 85800 CALL", "BFO"),
+    ("NIFTY 09 DEC 26000 CALL", "NFO"),
+    ("NIFTY 09 DEC 26000 PUT", "NFO")]
+   depth_data = tsl.full_market_depth_data(symbol_list)
+
+   for key, depth_client in depth_data.items():
+      bid_df, ask_df = tsl.get_market_depth_df(depth_client)
+   ```
+
+---
+
+9. **Alerts via Telegram**
 
    send a Alerts via Telegram
 
