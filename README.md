@@ -1,4 +1,4 @@
-# TradeHull Dhan Codebase
+# TradeHull Dhan Codebase Project
 
 This project is built to interact with the **Dhan API** using the `Dhan_Tradehull` library. It provides a comprehensive suite of tools for trading, fetching market data, placing orders, and analyzing options.
 

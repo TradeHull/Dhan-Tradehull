@@ -1,4 +1,4 @@
-from dhanhq import dhanhq
+from dhanhq import DhanContext, dhanhq, FullDepth
 import mibian
 import datetime
 import numpy as np
@@ -16,9 +16,15 @@ import warnings
 from typing import Tuple, Dict
 from collections import Counter
 import urllib.parse
+import threading
+import io
+import sys
+import re
+from collections import OrderedDict
+
 
 warnings.filterwarnings("ignore", category=FutureWarning)
-print("Codebase Version 3")
+print("Codebase Version 3.1.2")
 
 class Tradehull:    
 	clientCode                                      : str
@@ -57,7 +63,8 @@ class Tradehull:
 			self.index_step_dict                    = {'MIDCPNIFTY':25,'SENSEX':100,'BANKEX':100,'NIFTY': 50, 'NIFTY 50': 50, 'NIFTY BANK': 100, 'BANKNIFTY': 100, 'NIFTY FIN SERVICE': 50, 'FINNIFTY': 50}
 			self.token_dict 						= {'NIFTY':{'token':26000,'exchange':'NSECM'},'NIFTY 50':{'token':26000,'exchange':'NSECM'},'BANKNIFTY':{'token':26001,'exchange':'NSECM'},'NIFTY BANK':{'token':26001,'exchange':'NSECM'},'FINNIFTY':{'token':26034,'exchange':'NSECM'},'NIFTY FIN SERVICE':{'token':26034,'exchange':'NSECM'},'MIDCPNIFTY':{'token':26121,'exchange':'NSECM'},'NIFTY MID SELECT':{'token':26121,'exchange':'NSECM'},'SENSEX':{'token':26065,'exchange':'BSECM'},'BANKEX':{'token':26118,'exchange':'BSECM'}}
 			self.intervals_dict 					= {'minute': 3, '2minute':4, '3minute': 4, '5minute': 5, '10minute': 10,'15minute': 15, '30minute': 25, '60minute': 40, 'day': 80}
-			self.stock_step_df 						= {'SUNTV': 10, 'LTF': 2, 'VEDL': 10, 'SHRIRAMFIN': 10, 'GODREJPROP': 50, 'BHEL': 5, 'ATUL': 100, 'UNITDSPR': 20, 'SBIN': 10, 'PERSISTENT': 100, 'POWERGRID': 5, 'MARICO': 10, 'MOTHERSON': 2, 'HAVELLS': 20, 'BALKRISIND': 20, 'GRASIM': 20, 'MGL': 20, 'INDUSTOWER': 5, 'NATIONALUM': 5, 'DIVISLAB': 50, 'GNFC': 10, 'DLF': 10, 'AMBUJACEM': 5, 'CHOLAFIN': 20, 'IDFCFIRSTB': 1, 'CHAMBLFERT': 10, 'ABFRL': 5, 'CANFINHOME': 10, 'M&MFIN': 5, 'DABUR': 5, 'HINDCOPPER': 5, 'RAMCOCEM': 10, 'M&M': 50, 'NAVINFLUOR': 50, 'EXIDEIND': 5, 'ICICIGI': 20, 'TATAMOTORS': 10, 'GLENMARK': 20, 'POLYCAB': 100, 'CIPLA': 20, 'IOC': 2, 'INDUSINDBK': 10, 'CROMPTON': 5, 'PIDILITIND': 20, 'PIIND': 50, 'IDEA': 1, 'TATACONSUM': 10, 'METROPOLIS': 20, 'TVSMOTOR': 20, 'DEEPAKNTR': 50, 'RELIANCE': 10, 'CONCOR': 10, 'SUNPHARMA': 20, 'PETRONET': 5, 'ONGC': 2, 'ABBOTINDIA': 250, 'BHARTIARTL': 20, 'BEL': 5, 'BRITANNIA': 50, 'AARTIIND': 5, 'RBLBANK': 2, 'EICHERMOT': 50, 'SRF': 20, 'APOLLOHOSP': 50, 'GMRAIRPORT': 1, 'DRREDDY': 10, 'CANBK': 1, 'BPCL': 5, 'PEL': 20, 'ADANIPORTS': 20, 'TECHM': 20, 'ASIANPAINT': 20, 'ALKEM': 50, 'VOLTAS': 20, 'PNB': 1, 'MCX': 100, 'TATACHEM': 20, 'ZYDUSLIFE': 10, 'LICHSGFIN': 10, 'TATASTEEL': 1, 'BSOFT': 10, 'WIPRO': 2, 'SBICARD': 5, 'JUBLFOOD': 10, 'HAL': 50, 'TORNTPHARM': 50, 'CUMMINSIND': 50, 'COLPAL': 20, 'TCS': 50, 'GAIL': 2, 'IEX': 2, 'TITAN': 50, 'COALINDIA': 5, 'HDFCLIFE': 10, 'PFC': 10, 'CUB': 2, 'SHREECEM': 250, 'KOTAKBANK': 20, 'HEROMOTOCO': 50, 'BERGEPAINT': 5, 'SAIL': 2, 'MANAPPURAM': 2, 'SBILIFE': 20, 'SIEMENS': 100, 'NAUKRI': 100, 'LUPIN': 20, 'GRANULES': 10, 'MPHASIS': 50, 'RECLTD': 10, 'BANDHANBNK': 2, 'INDIAMART': 20, 'ICICIPRULI': 10, 'ULTRACEMCO': 100, 'LTIM': 100, 'DALBHARAT': 20, 'HINDUNILVR': 20, 'INDHOTEL': 10, 'MRF': 500, 'ICICIBANK': 10, 'JSWSTEEL': 10, 'ABCAPITAL': 2, 'BHARATFORG': 20, 'PVRINOX': 20, 'NMDC': 1, 'HDFCAMC': 50, 'LT': 50, 'BAJFINANCE': 200, 'INDIGO': 50, 'OFSS': 250, 'COROMANDEL': 20, 'SYNGENE': 10, 'INFY': 20, 'GODREJCP': 10, 'ABB': 100, 'DIXON': 250, 'UPL': 10, 'MARUTI': 100, 'TATACOMM': 20, 'IRCTC': 10, 'OBEROIRLTY': 20, 'BIOCON': 5, 'GUJGASLTD': 5, 'BAJAJFINSV': 20, 'MFSL': 20, 'HINDALCO': 10, 'HDFCBANK': 20, 'BOSCHLTD': 500, 'AUROPHARMA': 20, 'AXISBANK': 10, 'MUTHOOTFIN': 20, 'JKCEMENT': 50, 'TATAPOWER': 5, 'APOLLOTYRE': 10, 'UBL': 20, 'LALPATHLAB': 50, 'IPCALAB': 20, 'FEDERALBNK': 2, 'LAURUSLABS': 10, 'ADANIENT': 40, 'ACC': 20, 'JINDALSTEL': 20, 'COFORGE': 100, 'ASHOKLEY': 2, 'ASTRAL': 20, 'PAGEIND': 500, 'ESCORTS': 50, 'NESTLEIND': 20, 'BANKBARODA': 2, 'HINDPETRO': 5, 'HCLTECH': 20, 'TRENT': 100, 'BATAINDIA': 10, 'LTTS': 50, 'IGL': 2, 'AUBANK': 5, 'NTPC': 5, 'PAYTM': 20, 'TIINDIA': 50, 'OIL': 10, 'JSL': 10, 'ZOMATO': 5, 'JSWENERGY': 10, 'VBL': 10, 'ADANIENSOL': 20, 'CGPOWER': 10, 'SONACOMS': 10, 'JIOFIN': 5, 'NCC': 5, 'UNIONBANK': 1, 'CYIENT': 20, 'YESBANK': 1, 'LICI': 10, 'HFCL': 2, 'BANKINDIA': 1, 'ADANIGREEN': 20, 'IRB': 1, 'NHPC': 1, 'DELHIVERY': 5, 'PRESTIGE': 50, 'ATGL': 10, 'SJVN': 2, 'CESC': 5, 'MAXHEALTH': 20, 'IRFC': 2, 'APLAPOLLO': 20, 'KPITTECH': 20, 'LODHA': 20, 'DMART': 50, 'INDIANB': 10, 'KALYANKJIL': 20, 'POLICYBZR': 50, 'HUDCO': 5, 'ANGELONE': 200, 'NYKAA': 2, 'KEI': 100, 'SUPREMEIND': 100, 'POONAWALLA': 5, 'TATAELXSI': 100, 'CAMS': 100, 'ITC': 5, 'NBCC':2}
+			# self.stock_step_df 						= {'SUNTV': 10, 'LTF': 2, 'VEDL': 10, 'SHRIRAMFIN': 10, 'GODREJPROP': 50, 'BHEL': 5, 'ATUL': 100, 'UNITDSPR': 20, 'SBIN': 10, 'PERSISTENT': 100, 'POWERGRID': 5, 'MARICO': 10, 'MOTHERSON': 2, 'HAVELLS': 20, 'BALKRISIND': 20, 'GRASIM': 20, 'MGL': 20, 'INDUSTOWER': 5, 'NATIONALUM': 5, 'DIVISLAB': 50, 'GNFC': 10, 'DLF': 10, 'AMBUJACEM': 5, 'CHOLAFIN': 20, 'IDFCFIRSTB': 1, 'CHAMBLFERT': 10, 'ABFRL': 5, 'CANFINHOME': 10, 'M&MFIN': 5, 'DABUR': 5, 'HINDCOPPER': 5, 'RAMCOCEM': 10, 'M&M': 50, 'NAVINFLUOR': 50, 'EXIDEIND': 5, 'ICICIGI': 20, 'TATAMOTORS': 10, 'GLENMARK': 20, 'POLYCAB': 100, 'CIPLA': 20, 'IOC': 2, 'INDUSINDBK': 10, 'CROMPTON': 5, 'PIDILITIND': 20, 'PIIND': 50, 'IDEA': 1, 'TATACONSUM': 10, 'METROPOLIS': 20, 'TVSMOTOR': 20, 'DEEPAKNTR': 50, 'RELIANCE': 10, 'CONCOR': 10, 'SUNPHARMA': 20, 'PETRONET': 5, 'ONGC': 2, 'ABBOTINDIA': 250, 'BHARTIARTL': 20, 'BEL': 5, 'BRITANNIA': 50, 'AARTIIND': 5, 'RBLBANK': 2, 'EICHERMOT': 50, 'SRF': 20, 'APOLLOHOSP': 50, 'GMRAIRPORT': 1, 'DRREDDY': 10, 'CANBK': 1, 'BPCL': 5, 'PEL': 20, 'ADANIPORTS': 20, 'TECHM': 20, 'ASIANPAINT': 20, 'ALKEM': 50, 'VOLTAS': 20, 'PNB': 1, 'MCX': 100, 'TATACHEM': 20, 'ZYDUSLIFE': 10, 'LICHSGFIN': 10, 'TATASTEEL': 1, 'BSOFT': 10, 'WIPRO': 2, 'SBICARD': 5, 'JUBLFOOD': 10, 'HAL': 50, 'TORNTPHARM': 50, 'CUMMINSIND': 50, 'COLPAL': 20, 'TCS': 50, 'GAIL': 2, 'IEX': 2, 'TITAN': 50, 'COALINDIA': 5, 'HDFCLIFE': 10, 'PFC': 10, 'CUB': 2, 'SHREECEM': 250, 'KOTAKBANK': 20, 'HEROMOTOCO': 50, 'BERGEPAINT': 5, 'SAIL': 2, 'MANAPPURAM': 2, 'SBILIFE': 20, 'SIEMENS': 100, 'NAUKRI': 100, 'LUPIN': 20, 'GRANULES': 10, 'MPHASIS': 50, 'RECLTD': 10, 'BANDHANBNK': 2, 'INDIAMART': 20, 'ICICIPRULI': 10, 'ULTRACEMCO': 100, 'LTIM': 100, 'DALBHARAT': 20, 'HINDUNILVR': 20, 'INDHOTEL': 10, 'MRF': 500, 'ICICIBANK': 10, 'JSWSTEEL': 10, 'ABCAPITAL': 2, 'BHARATFORG': 20, 'PVRINOX': 20, 'NMDC': 1, 'HDFCAMC': 50, 'LT': 50, 'BAJFINANCE': 200, 'INDIGO': 50, 'OFSS': 250, 'COROMANDEL': 20, 'SYNGENE': 10, 'INFY': 20, 'GODREJCP': 10, 'ABB': 100, 'DIXON': 250, 'UPL': 10, 'MARUTI': 100, 'TATACOMM': 20, 'IRCTC': 10, 'OBEROIRLTY': 20, 'BIOCON': 5, 'GUJGASLTD': 5, 'BAJAJFINSV': 20, 'MFSL': 20, 'HINDALCO': 10, 'HDFCBANK': 20, 'BOSCHLTD': 500, 'AUROPHARMA': 20, 'AXISBANK': 10, 'MUTHOOTFIN': 20, 'JKCEMENT': 50, 'TATAPOWER': 5, 'APOLLOTYRE': 10, 'UBL': 20, 'LALPATHLAB': 50, 'IPCALAB': 20, 'FEDERALBNK': 2, 'LAURUSLABS': 10, 'ADANIENT': 40, 'ACC': 20, 'JINDALSTEL': 20, 'COFORGE': 100, 'ASHOKLEY': 2, 'ASTRAL': 20, 'PAGEIND': 500, 'ESCORTS': 50, 'NESTLEIND': 20, 'BANKBARODA': 2, 'HINDPETRO': 5, 'HCLTECH': 20, 'TRENT': 100, 'BATAINDIA': 10, 'LTTS': 50, 'IGL': 2, 'AUBANK': 5, 'NTPC': 5, 'PAYTM': 20, 'TIINDIA': 50, 'OIL': 10, 'JSL': 10, 'ZOMATO': 5, 'JSWENERGY': 10, 'VBL': 10, 'ADANIENSOL': 20, 'CGPOWER': 10, 'SONACOMS': 10, 'JIOFIN': 5, 'NCC': 5, 'UNIONBANK': 1, 'CYIENT': 20, 'YESBANK': 1, 'LICI': 10, 'HFCL': 2, 'BANKINDIA': 1, 'ADANIGREEN': 20, 'IRB': 1, 'NHPC': 1, 'DELHIVERY': 5, 'PRESTIGE': 50, 'ATGL': 10, 'SJVN': 2, 'CESC': 5, 'MAXHEALTH': 20, 'IRFC': 2, 'APLAPOLLO': 20, 'KPITTECH': 20, 'LODHA': 20, 'DMART': 50, 'INDIANB': 10, 'KALYANKJIL': 20, 'POLICYBZR': 50, 'HUDCO': 5, 'ANGELONE': 200, 'NYKAA': 2, 'KEI': 100, 'SUPREMEIND': 100, 'POONAWALLA': 5, 'TATAELXSI': 100, 'CAMS': 100, 'ITC': 5, 'NBCC':2}
+			self.stock_step_df = self.dhan_equity_step_creation()
 			self.commodity_step_dict 				= {'GOLD': 100,'SILVER': 250,'CRUDEOIL': 50,'NATURALGAS': 5,'COPPER': 5,'NICKEL': 10,'ZINC': 2.5,'LEAD': 1, 'ALUMINIUM': 1,    'COTTON': 100,     'MENTHAOIL': 10,   'GOLDM': 50,       'GOLDPETAL': 5,    'GOLDGUINEA': 10,  'SILVERM': 250,     'SILVERMIC': 10,   'BRASS': 5,        'CASTORSEED': 100, 'COTTONSEEDOILCAKE''CARDAMOM': 50,    'RBDPALMOLEIN': 10,'CRUDEPALMOIL': 10,'PEPPER': 100,     'JEERA': 100,      'SOYABEAN': 50,    'SOYAOIL': 10,     'TURMERIC': 100,   'GUARGUM': 100,    'GUARSEED': 100,   'CHANA': 50,       'MUSTARDSEED': 50, 'BARLEY': 50,      'SUGARM': 50,      'WHEAT': 50,       'MAIZE': 50,       'PADDY': 50,       'BAJRA': 50,       'JUTE': 50,        'RUBBER': 100,     'COFFEE': 50,      'COPRA': 50,       'SESAMESEED': 50,  'TEA': 100,        'KAPAS': 100,      'BARLEYFEED': 50,  'RAPESEED': 50,    'LINSEED': 50,     'SUNFLOWER': 50,   'CORIANDER': 50,   'CUMINSEED': 100   }
 			self.start_date, self.end_date          = self.get_start_date()
 			self.correct_list  						= {'SUNTV': 10, 'LTF': 2, 'VEDL': 10, 'SHRIRAMFIN': 10, 'GODREJPROP': 50, 'BHEL': 5, 'ATUL': 100, 'UNITDSPR': 20, 'SBIN': 10, 'PERSISTENT': 100, 'POWERGRID': 5, 'MARICO': 10, 'MOTHERSON': 2, 'HAVELLS': 20, 'BALKRISIND': 20, 'GRASIM': 20, 'MGL': 20, 'INDUSTOWER': 5, 'NATIONALUM': 5, 'DIVISLAB': 50, 'GNFC': 10, 'DLF': 10, 'AMBUJACEM': 5, 'CHOLAFIN': 20, 'IDFCFIRSTB': 1, 'CHAMBLFERT': 10, 'ABFRL': 5, 'CANFINHOME': 10, 'M&MFIN': 5, 'DABUR': 5, 'HINDCOPPER': 5, 'RAMCOCEM': 10, 'M&M': 50, 'NAVINFLUOR': 50, 'EXIDEIND': 5, 'ICICIGI': 20, 'TATAMOTORS': 10, 'GLENMARK': 20, 'POLYCAB': 100, 'CIPLA': 20, 'IOC': 2, 'INDUSINDBK': 10, 'CROMPTON': 5, 'PIDILITIND': 20, 'PIIND': 50, 'IDEA': 1, 'TATACONSUM': 10, 'METROPOLIS': 20, 'TVSMOTOR': 20, 'DEEPAKNTR': 50, 'RELIANCE': 10, 'CONCOR': 10, 'SUNPHARMA': 20, 'PETRONET': 5, 'ONGC': 2, 'ABBOTINDIA': 250, 'BHARTIARTL': 20, 'BEL': 5, 'BRITANNIA': 50, 'AARTIIND': 5, 'RBLBANK': 2, 'EICHERMOT': 50, 'SRF': 20, 'APOLLOHOSP': 50, 'GMRAIRPORT': 1, 'DRREDDY': 10, 'CANBK': 1, 'BPCL': 5, 'PEL': 20, 'ADANIPORTS': 20, 'TECHM': 20, 'ASIANPAINT': 20, 'ALKEM': 50, 'VOLTAS': 20, 'PNB': 1, 'MCX': 100, 'TATACHEM': 20, 'ZYDUSLIFE': 10, 'LICHSGFIN': 10, 'TATASTEEL': 1, 'BSOFT': 10, 'WIPRO': 2, 'SBICARD': 5, 'JUBLFOOD': 10, 'HAL': 50, 'TORNTPHARM': 50, 'CUMMINSIND': 50, 'COLPAL': 20, 'TCS': 50, 'GAIL': 2, 'IEX': 2, 'TITAN': 50, 'COALINDIA': 5, 'HDFCLIFE': 10, 'PFC': 10, 'CUB': 2, 'SHREECEM': 250, 'KOTAKBANK': 20, 'HEROMOTOCO': 50, 'BERGEPAINT': 5, 'SAIL': 2, 'MANAPPURAM': 2, 'SBILIFE': 20, 'SIEMENS': 100, 'NAUKRI': 100, 'LUPIN': 20, 'GRANULES': 10, 'MPHASIS': 50, 'RECLTD': 10, 'BANDHANBNK': 2, 'INDIAMART': 20, 'ICICIPRULI': 10, 'ULTRACEMCO': 100, 'LTIM': 100, 'DALBHARAT': 20, 'HINDUNILVR': 20, 'INDHOTEL': 10, 'MRF': 500, 'ICICIBANK': 10, 'JSWSTEEL': 10, 'ABCAPITAL': 2, 'BHARATFORG': 20, 'PVRINOX': 20, 'NMDC': 1, 'HDFCAMC': 50, 'LT': 50, 'BAJFINANCE': 200, 'INDIGO': 50, 'OFSS': 250, 'COROMANDEL': 20, 'SYNGENE': 10, 'INFY': 20, 'GODREJCP': 10, 'ABB': 100, 'DIXON': 250, 'UPL': 10, 'MARUTI': 100, 'TATACOMM': 20, 'IRCTC': 10, 'OBEROIRLTY': 20, 'BIOCON': 5, 'GUJGASLTD': 5, 'BAJAJFINSV': 20, 'MFSL': 20, 'HINDALCO': 10, 'HDFCBANK': 20, 'BOSCHLTD': 500, 'AUROPHARMA': 20, 'AXISBANK': 10, 'MUTHOOTFIN': 20, 'JKCEMENT': 50, 'TATAPOWER': 5, 'APOLLOTYRE': 10, 'UBL': 20, 'LALPATHLAB': 50, 'IPCALAB': 20, 'FEDERALBNK': 2, 'LAURUSLABS': 10, 'ADANIENT': 40, 'ACC': 20, 'JINDALSTEL': 20, 'COFORGE': 100, 'ASHOKLEY': 2, 'ASTRAL': 20, 'PAGEIND': 500, 'ESCORTS': 50, 'NESTLEIND': 20, 'BANKBARODA': 2, 'HINDPETRO': 5, 'HCLTECH': 20, 'TRENT': 100, 'BATAINDIA': 10, 'LTTS': 50, 'IGL': 2, 'AUBANK': 5, 'NTPC': 5, 'PAYTM': 20, 'TIINDIA': 50, 'OIL': 10, 'JSL': 10, 'ZOMATO': 5, 'JSWENERGY': 10, 'VBL': 10, 'ADANIENSOL': 20, 'CGPOWER': 10, 'SONACOMS': 10, 'JIOFIN': 5, 'NCC': 5, 'UNIONBANK': 1, 'CYIENT': 20, 'YESBANK': 1, 'LICI': 10, 'HFCL': 2, 'BANKINDIA': 1, 'ADANIGREEN': 20, 'IRB': 1, 'NHPC': 1, 'DELHIVERY': 5, 'PRESTIGE': 50, 'ATGL': 10, 'SJVN': 2, 'CESC': 5, 'MAXHEALTH': 20, 'IRFC': 2, 'APLAPOLLO': 20, 'KPITTECH': 20, 'LODHA': 20, 'DMART': 50, 'INDIANB': 10, 'KALYANKJIL': 20, 'POLICYBZR': 50, 'HUDCO': 5, 'ANGELONE': 200, 'NYKAA': 2, 'KEI': 100, 'SUPREMEIND': 100, 'POONAWALLA': 5, 'TATAELXSI': 100, 'CAMS': 100, 'ITC': 5, 'NBCC':2}
@@ -71,7 +78,8 @@ class Tradehull:
 			self.ClientCode 									= ClientCode
 			self.token_id										= token_id
 			print("-----Logged into Dhan-----")
-			self.Dhan = dhanhq(self.ClientCode, self.token_id)
+			self.dhan_context = DhanContext(self.ClientCode, self.token_id)
+			self.Dhan = dhanhq(self.dhan_context)
 			self.instrument_df 									= self.get_instrument_file()
 			print('Got the instrument file')
 		except Exception as e:
@@ -135,7 +143,7 @@ class Tradehull:
 				
 				expiry = expiry_dates[0]  # Assuming the first expiry is the desired one
 
-				# Filter for CE option type and calculate step values
+				# Filter for CE option type and calculate step_size values
 				ce_condition = (
 					(filtered_df['SEM_TRADING_SYMBOL'].str.startswith(name + '-')) &
 					(filtered_df['SEM_CUSTOM_SYMBOL'].str.contains(name)) &
@@ -152,7 +160,7 @@ class Tradehull:
 				difference_counts = Counter(differences)
 				step_value, max_frequency = difference_counts.most_common(1)[0]
 
-				# Update the step value for the symbol
+				# Update the step_size value for the symbol
 				self.stock_step_df[name] = step_value
 				self.correct_list[name] = step_value
 				print(f"Correct list for {name} is {self.correct_list}")
@@ -160,15 +168,98 @@ class Tradehull:
 			except Exception as e:
 				self.logger.exception(f"Error processing {name}: {e}")
 				# print(f"Error processing {name}: {e}")		
+	
+	def get_ltp_data(self,names, debug="NO"):
+		try:
+			instrument_df = self.instrument_df.copy()
+			instruments = {'NSE_EQ':[],'IDX_I':[],'NSE_FNO':[],'NSE_CURRENCY':[],'BSE_EQ':[],'BSE_FNO':[],'BSE_CURRENCY':[],'MCX_COMM':[]}
+			instrument_names = {}
+			NFO = ["BANKNIFTY","NIFTY","MIDCPNIFTY","FINNIFTY"]
+			BFO = ['SENSEX','BANKEX']
+			equity = ['CALL','PUT','FUT']		
+			exchange_index = {"BANKNIFTY": "NSE_IDX","NIFTY":"NSE_IDX","MIDCPNIFTY":"NSE_IDX", "FINNIFTY":"NSE_IDX","SENSEX":"BSE_IDX","BANKEX":"BSE_IDX", "INDIA VIX":"IDX_I"}
+			if not isinstance(names, list):
+				names = [names]
+			for name in names:
+				try:
+					name = name.upper()
+					if name in exchange_index.keys():
+						security_check = instrument_df[((instrument_df['SEM_CUSTOM_SYMBOL']==name)|(instrument_df['SEM_TRADING_SYMBOL']==name))]
+						if security_check.empty:
+							raise Exception("Check the Tradingsymbol")
+						security_id = security_check.iloc[-1]['SEM_SMST_SECURITY_ID']
+						instruments['IDX_I'].append(int(security_id))
+						instrument_names[str(security_id)]=name
+					elif name in self.commodity_step_dict.keys():
+						security_check = instrument_df[(instrument_df['SEM_EXM_EXCH_ID']=='MCX')&(instrument_df['SM_SYMBOL_NAME']==name.upper())&(instrument_df['SEM_INSTRUMENT_NAME']=='FUTCOM')]						
+						if security_check.empty:
+							raise Exception("Check the Tradingsymbol")
+						security_id = security_check.sort_values(by='SEM_EXPIRY_DATE').iloc[0]['SEM_SMST_SECURITY_ID']
+						instruments['MCX_COMM'].append(int(security_id))
+						instrument_names[str(security_id)]=name
+					else:
+						security_check = instrument_df[((instrument_df['SEM_CUSTOM_SYMBOL']==name)|(instrument_df['SEM_TRADING_SYMBOL']==name))]
+						if security_check.empty:
+							raise Exception("Check the Tradingsymbol")						
+						security_id = security_check.iloc[-1]['SEM_SMST_SECURITY_ID']
+						nfo_check = ['NSE_FNO' for nfo in NFO if nfo in name]
+						bfo_check = ['BSE_FNO' for bfo in BFO if bfo in name]
+						exchange_nfo ='NSE_FNO' if len(nfo_check)!=0 else False
+						exchange_bfo = 'BSE_FNO' if len(bfo_check)!=0 else False
+						if not exchange_nfo and not exchange_bfo:
+							eq_check =['NSE_FNO' for nfo in equity if nfo in name]
+							exchange_eq ='NSE_FNO' if len(eq_check)!=0 else "NSE_EQ"
+						else:
+							exchange_eq="NSE_EQ"
+						exchange ='NSE_FNO' if exchange_nfo else ('BSE_FNO' if exchange_bfo else exchange_eq)
+						trail_exchange = exchange
+						mcx_check = ['MCX_COMM' for mcx in self.commodity_step_dict.keys() if mcx in name]
+						exchange = "MCX_COMM" if len(mcx_check)!=0 else exchange
+						if exchange == "MCX_COMM": 
+							if instrument_df[((instrument_df['SEM_CUSTOM_SYMBOL']==name)|(instrument_df['SEM_TRADING_SYMBOL']==name))&(instrument_df['SEM_EXM_EXCH_ID']=='MCX')].empty:
+								exchange = trail_exchange
+						if exchange == "MCX_COMM":
+							security_check = instrument_df[((instrument_df['SEM_CUSTOM_SYMBOL']==name)|(instrument_df['SEM_TRADING_SYMBOL']==name))&(instrument_df['SEM_EXM_EXCH_ID']=='MCX')]
+							if security_check.empty:
+								raise Exception("Check the Tradingsymbol")	
+							security_id = security_check.iloc[-1]['SEM_SMST_SECURITY_ID']
+						instruments[exchange].append(int(security_id))
+						instrument_names[str(security_id)]=name
+				except Exception as e:
+					print(f"Exception for instrument name {name} as {e}")
+					continue
+			time.sleep(0.4)
+			data = self.Dhan.ticker_data(instruments)
+			ltp_data=dict()
+			
+			if debug.upper()=="YES":
+				print(data)			
+
+			if data['status']!='failure':
+				inner = data["data"]["data"]
+
+				for exchange, sec_dict in inner.items():
+					for sec_id, quotes in sec_dict.items():
+						if sec_id in instrument_names:
+							symbol = instrument_names[sec_id]
+							ltp_data[symbol] = float(quotes["last_price"])
+			else:
+				raise Exception(data)
+			
+			return ltp_data
+		except Exception as e:
+			print(f"Exception at calling ltp as {e}")
+			self.logger.exception(f"Exception at calling ltp as {e}")
+			return dict()
 
 
-	def order_placement(self,tradingsymbol:str, exchange:str,quantity:int, price:int, trigger_price:int, order_type:str, transaction_type:str, trade_type:str,disclosed_quantity=0,after_market_order=False,validity ='DAY', amo_time='OPEN',bo_profit_value=None, bo_stop_loss_Value=None)->str:
+	def order_placement(self,tradingsymbol:str, exchange:str,quantity:int, price:int, trigger_price:int, order_type:str, transaction_type:str, trade_type:str,disclosed_quantity=0,after_market_order=False,validity ='DAY', amo_time='OPEN',bo_profit_value=None, bo_stop_loss_Value=None, tag=None)->str:
 		try:
 			tradingsymbol = tradingsymbol.upper()
 			exchange = exchange.upper()
 			instrument_df = self.instrument_df.copy()
-			# script_exchange = {"NSE":self.Dhan.NSE, "NFO":self.Dhan.NSE_FNO, "BFO":self.Dhan.BSE_FNO, "CUR": self.Dhan.CUR, "BSE":self.Dhan.BSE, "MCX":self.Dhan.MCX}
-			script_exchange = {"NSE":self.Dhan.NSE, "NFO":self.Dhan.FNO, "BFO":"BSE_FNO", "CUR": self.Dhan.CUR, "BSE":self.Dhan.BSE, "MCX":self.Dhan.MCX}
+			# script_exchange = {"NSE":self.Dhan.NSE, "NFO":self.Dhan.FNO, "BFO":"BSE_FNO", "CUR": self.Dhan.CUR, "BSE":self.Dhan.BSE, "MCX":self.Dhan.MCX}
+			script_exchange = {"NSE":self.Dhan.NSE, "NFO":self.Dhan.NSE_FNO, "BFO":self.Dhan.BSE_FNO, "CUR": self.Dhan.CUR, "BSE":self.Dhan.BSE, "MCX":self.Dhan.MCX}
 			self.order_Type = {'LIMIT': self.Dhan.LIMIT, 'MARKET': self.Dhan.MARKET,'STOPLIMIT': self.Dhan.SL, 'STOPMARKET': self.Dhan.SLM}
 			product = {'MIS':self.Dhan.INTRA, 'MARGIN':self.Dhan.MARGIN, 'MTF':self.Dhan.MTF, 'CO':self.Dhan.CO,'BO':self.Dhan.BO, 'CNC': self.Dhan.CNC}
 			Validity = {'DAY': "DAY", 'IOC': 'IOC'}
@@ -196,8 +287,8 @@ class Tradehull:
 											   transaction_type=order_side, quantity=int(quantity),
 											   order_type=order_type, product_type=product_Type, price=float(price),
 											   trigger_price=float(trigger_price),disclosed_quantity=int(disclosed_quantity),
-					after_market_order=after_market_order, validity=time_in_force, amo_time=amo_time,
-					bo_profit_value=bo_profit_value, bo_stop_loss_Value=bo_stop_loss_Value)
+												after_market_order=after_market_order, validity=time_in_force, amo_time=amo_time,
+												bo_profit_value=bo_profit_value, bo_stop_loss_Value=bo_stop_loss_Value, tag = tag)
 			
 			if order['status']=='failure':
 				raise Exception(order)
@@ -211,7 +302,7 @@ class Tradehull:
 	
 	def modify_order(self, order_id, order_type, quantity, price=0, trigger_price=0, disclosed_quantity=0, validity='DAY',leg_name = None):
 		try:
-			script_exchange = {"NSE":self.Dhan.NSE, "NFO":self.Dhan.FNO, "BFO":"BSE_FNO", "CUR": self.Dhan.CUR, "BSE":self.Dhan.BSE, "MCX":self.Dhan.MCX}
+			script_exchange = {"NSE":self.Dhan.NSE, "NFO":self.Dhan.NSE_FNO, "BFO": self.Dhan.BSE_FNO, "CUR": self.Dhan.CUR, "BSE":self.Dhan.BSE, "MCX":self.Dhan.MCX}
 			self.order_Type = {'LIMIT': self.Dhan.LIMIT, 'MARKET': self.Dhan.MARKET,'STOPLIMIT': self.Dhan.SL, 'STOPMARKET': self.Dhan.SLM}
 			product = {'MIS':self.Dhan.INTRA, 'MARGIN':self.Dhan.MARGIN, 'MTF':self.Dhan.MTF, 'CO':self.Dhan.CO,'BO':self.Dhan.BO, 'CNC': self.Dhan.CNC}
 			Validity = {'DAY': "DAY", 'IOC': 'IOC'}
@@ -247,9 +338,9 @@ class Tradehull:
 		
 	
 	def place_slice_order(self, tradingsymbol, exchange, transaction_type, quantity,
-                           order_type, trade_type, price, trigger_price=0, disclosed_quantity=0,
-                           after_market_order=False, validity='DAY', amo_time='OPEN',
-                           bo_profit_value=None, bo_stop_loss_Value=None):
+						   order_type, trade_type, price, trigger_price=0, disclosed_quantity=0,
+						   after_market_order=False, validity='DAY', amo_time='OPEN',
+						   bo_profit_value=None, bo_stop_loss_Value=None):
 		try:
 			tradingsymbol = tradingsymbol.upper()
 			exchange = exchange.upper()
@@ -369,15 +460,15 @@ class Tradehull:
 			return 0
 	
 
-	def convert_to_date_time(self,time):
-		return self.Dhan.convert_to_date_time(time)
+	def convert_to_date_time(self,epoch):
+		return self.Dhan.convert_to_date_time(self.Dhan,epoch)
 	
 
 	def get_start_date(self):
 		try:
 			instrument_df = self.instrument_df.copy()
-			from_date= datetime.datetime.now()-datetime.timedelta(days=100)
-			start_date = (datetime.datetime.now()-datetime.timedelta(days=5)).strftime('%Y-%m-%d')
+			from_date= datetime.datetime.now()-datetime.timedelta(days=90)
+			start_date = (datetime.datetime.now()-datetime.timedelta(days=90)).strftime('%Y-%m-%d')
 			from_date = from_date.strftime('%Y-%m-%d')
 			to_date = datetime.datetime.now().strftime('%Y-%m-%d')
 			instrument_exchange = {'NSE':"NSE",'BSE':"BSE",'NFO':'NSE','BFO':'BSE','MCX':'MCX','CUR':'NSE'}
@@ -393,7 +484,7 @@ class Tradehull:
 				df = pd.DataFrame(ohlc['data'])
 				if not df.empty:
 					df['timestamp'] = df['timestamp'].apply(lambda x: self.convert_to_date_time(x))
-					start_date = df.iloc[-2]['timestamp']
+					start_date = df.iloc[0]['timestamp']
 					start_date = start_date.strftime('%Y-%m-%d')
 					return start_date, to_date
 				else:
@@ -404,21 +495,28 @@ class Tradehull:
 			self.logger.exception(f"Error at getting start date as {e}")
 			return start_date, to_date
 
-	def get_historical_data(self,tradingsymbol,exchange,timeframe, debug="NO"):			
+	def get_historical_data(self,tradingsymbol,exchange,timeframe, sector = "NO",debug="NO"):			
 		try:
-			tradingsymbol = tradingsymbol.upper()
+			# tradingsymbol = tradingsymbol.upper()
 			exchange = exchange.upper()
 			instrument_df = self.instrument_df.copy()
 			from_date= datetime.datetime.now()-datetime.timedelta(days=365)
 			from_date = from_date.strftime('%Y-%m-%d')
 			to_date = datetime.datetime.now().strftime('%Y-%m-%d') 
-			# script_exchange = {"NSE":self.Dhan.NSE, "NFO":self.Dhan.NSE_FNO, "BFO":self.Dhan.BSE_FNO, "CUR": self.Dhan.CUR, "BSE":self.Dhan.BSE, "MCX":self.Dhan.MCX}
-			script_exchange = {"NSE":self.Dhan.NSE, "NFO":self.Dhan.FNO, "BFO":"BSE_FNO", "CUR": self.Dhan.CUR, "BSE":self.Dhan.BSE, "MCX":self.Dhan.MCX, "INDEX":self.Dhan.INDEX}
+			script_exchange = {"NSE":self.Dhan.NSE, "NFO":self.Dhan.NSE_FNO, "BFO":self.Dhan.BSE_FNO, "CUR": self.Dhan.CUR, "BSE":self.Dhan.BSE, "MCX":self.Dhan.MCX, "INDEX":self.Dhan.INDEX}
 			instrument_exchange = {'NSE':"NSE",'BSE':"BSE",'NFO':'NSE','BFO':'BSE','MCX':'MCX','CUR':'NSE'}
 			exchange_segment = script_exchange[exchange]
 			index_exchange = {"NIFTY":'NSE',"BANKNIFTY":"NSE","FINNIFTY":"NSE","MIDCPNIFTY":"NSE","BANKEX":"BSE","SENSEX":"BSE"}
+			
 			if tradingsymbol in index_exchange:
 				exchange =index_exchange[tradingsymbol]
+
+			if sector.upper()=="YES":
+				security_check = instrument_df[((instrument_df['SEM_TRADING_SYMBOL']==tradingsymbol)|(instrument_df['SEM_CUSTOM_SYMBOL']==tradingsymbol))&(instrument_df['SEM_EXM_EXCH_ID']==exchange)]
+				if security_check.empty:
+					raise Exception("Check the Tradingsymbol or Exchange")
+				security_id = security_check.iloc[-1]['SEM_SMST_SECURITY_ID']
+				exchange_segment = "IDX_I"
 
 			if tradingsymbol in self.commodity_step_dict.keys():
 				security_check = instrument_df[(instrument_df['SEM_EXM_EXCH_ID']=='MCX')&(instrument_df['SM_SYMBOL_NAME']==tradingsymbol.upper())&(instrument_df['SEM_INSTRUMENT_NAME']=='FUTCOM')]						
@@ -443,11 +541,10 @@ class Tradehull:
 				pass
 			else:
 				raise Exception("interval value must be ['1','5','15','25','60','DAY']")
+			
 			if timeframe.upper() == "DAY":
-				time.sleep(2)			
 				ohlc = self.Dhan.historical_daily_data(int(security_id),exchange_segment,instrument_type,from_date,to_date,int(expiry_code))
 			else:
-				time.sleep(2)
 				ohlc = self.Dhan.intraday_minute_data(str(security_id),exchange_segment,instrument_type,self.start_date,self.end_date,int(interval))
 			
 			if debug.upper()=="YES":
@@ -457,6 +554,7 @@ class Tradehull:
 				df = pd.DataFrame(ohlc['data'])
 				if not df.empty:
 					df['timestamp'] = df['timestamp'].apply(lambda x: self.convert_to_date_time(x))
+					
 					return df
 				else:
 					return df
@@ -467,66 +565,6 @@ class Tradehull:
 			self.logger.exception(f"Exception in Getting OHLC data as {e}")
 			# traceback.print_exc()
 
-	def get_intraday_data(self,tradingsymbol,exchange,timeframe, debug="NO"):			
-		try:
-			tradingsymbol = tradingsymbol.upper()
-			exchange = exchange.upper()
-			instrument_df = self.instrument_df.copy()
-			available_frames = {
-				2: '2T',    # 2 minutes
-				3: '3T',    # 3 minutes
-				5: '5T',    # 5 minutes
-				10: '10T',   # 10 minutes
-				15: '15T',   # 15 minutes
-				30: '30T',   # 30 minutes
-				60: '60T'    # 60 minutes
-			}
-
-			start_date =datetime.datetime.now().strftime('%Y-%m-%d')
-			end_date = datetime.datetime.now().strftime('%Y-%m-%d')
-
-			# script_exchange = {"NSE":self.Dhan.NSE, "NFO":self.Dhan.NSE_FNO, "BFO":self.Dhan.BSE_FNO, "CUR": self.Dhan.CUR, "BSE":self.Dhan.BSE, "MCX":self.Dhan.MCX}
-			script_exchange = {"NSE":self.Dhan.NSE, "NFO":self.Dhan.FNO, "BFO":"BSE_FNO", "CUR": self.Dhan.CUR, "BSE":self.Dhan.BSE, "MCX":self.Dhan.MCX, "INDEX":self.Dhan.INDEX}
-			instrument_exchange = {'NSE':"NSE",'BSE':"BSE",'NFO':'NSE','BFO':'BSE','MCX':'MCX','CUR':'NSE'}
-			exchange_segment = script_exchange[exchange]
-			index_exchange = {"NIFTY":'NSE',"BANKNIFTY":"NSE","FINNIFTY":"NSE","MIDCPNIFTY":"NSE","BANKEX":"BSE","SENSEX":"BSE"}
-			if tradingsymbol in index_exchange:
-				exchange =index_exchange[tradingsymbol]
-			if tradingsymbol in self.commodity_step_dict.keys():
-				security_check = instrument_df[(instrument_df['SEM_EXM_EXCH_ID']=='MCX')&(instrument_df['SM_SYMBOL_NAME']==tradingsymbol.upper())&(instrument_df['SEM_INSTRUMENT_NAME']=='FUTCOM')]						
-				if security_check.empty:
-					raise Exception("Check the Tradingsymbol or Exchange")
-				security_id = security_check.sort_values(by='SEM_EXPIRY_DATE').iloc[0]['SEM_SMST_SECURITY_ID']
-				tradingsymbol = security_check.sort_values(by='SEM_EXPIRY_DATE').iloc[0]['SEM_CUSTOM_SYMBOL']
-			else:						
-				security_check = instrument_df[((instrument_df['SEM_TRADING_SYMBOL']==tradingsymbol)|(instrument_df['SEM_CUSTOM_SYMBOL']==tradingsymbol))&(instrument_df['SEM_EXM_EXCH_ID']==instrument_exchange[exchange])]
-				if security_check.empty:
-					raise Exception("Check the Tradingsymbol or Exchange")
-				security_id = security_check.iloc[-1]['SEM_SMST_SECURITY_ID']	
-
-			instrument_type = instrument_df[((instrument_df['SEM_TRADING_SYMBOL']==tradingsymbol)|(instrument_df['SEM_CUSTOM_SYMBOL']==tradingsymbol))&(instrument_df['SEM_EXM_EXCH_ID']==instrument_exchange[exchange])].iloc[-1]['SEM_INSTRUMENT_NAME']
-			time.sleep(2)
-			ohlc = self.Dhan.intraday_minute_data(str(security_id),exchange_segment,instrument_type,start_date,end_date,int(1))
-			
-			if debug.upper()=="YES":
-				print(ohlc)
-
-			if ohlc['status']!='failure':
-				df = pd.DataFrame(ohlc['data'])
-				if not df.empty:
-					df['timestamp'] = df['timestamp'].apply(lambda x: self.convert_to_date_time(x))
-					if timeframe==1:
-						return df
-					df = self.resample_timeframe(df,available_frames[timeframe])
-					return df
-				else:
-					return df
-			else:
-				raise Exception(ohlc) 
-		except Exception as e:
-			print(e)
-			self.logger.exception(f"Exception in Getting OHLC data as {e}")
-			traceback.print_exc()
 
 	def resample_timeframe(self, df, timeframe='5T'):
 		try:
@@ -576,88 +614,6 @@ class Tradehull:
 			return int(data.iloc[0]['SEM_LOT_UNITS'])
 		
 
-	def get_ltp_data(self,names, debug="NO"):
-		try:
-			instrument_df = self.instrument_df.copy()
-			instruments = {'NSE_EQ':[],'IDX_I':[],'NSE_FNO':[],'NSE_CURRENCY':[],'BSE_EQ':[],'BSE_FNO':[],'BSE_CURRENCY':[],'MCX_COMM':[]}
-			instrument_names = {}
-			NFO = ["BANKNIFTY","NIFTY","MIDCPNIFTY","FINNIFTY"]
-			BFO = ['SENSEX','BANKEX']
-			equity = ['CALL','PUT','FUT']		
-			exchange_index = {"BANKNIFTY": "NSE_IDX","NIFTY":"NSE_IDX","MIDCPNIFTY":"NSE_IDX", "FINNIFTY":"NSE_IDX","SENSEX":"BSE_IDX","BANKEX":"BSE_IDX", "INDIA VIX":"IDX_I"}
-			if not isinstance(names, list):
-				names = [names]
-			for name in names:
-				try:
-					name = name.upper()
-					if name in exchange_index.keys():
-						security_check = instrument_df[((instrument_df['SEM_CUSTOM_SYMBOL']==name)|(instrument_df['SEM_TRADING_SYMBOL']==name))]
-						if security_check.empty:
-							raise Exception("Check the Tradingsymbol")
-						security_id = security_check.iloc[-1]['SEM_SMST_SECURITY_ID']
-						instruments['IDX_I'].append(int(security_id))
-						instrument_names[str(security_id)]=name
-					elif name in self.commodity_step_dict.keys():
-						security_check = instrument_df[(instrument_df['SEM_EXM_EXCH_ID']=='MCX')&(instrument_df['SM_SYMBOL_NAME']==name.upper())&(instrument_df['SEM_INSTRUMENT_NAME']=='FUTCOM')]						
-						if security_check.empty:
-							raise Exception("Check the Tradingsymbol")
-						security_id = security_check.sort_values(by='SEM_EXPIRY_DATE').iloc[0]['SEM_SMST_SECURITY_ID']
-						instruments['MCX_COMM'].append(int(security_id))
-						instrument_names[str(security_id)]=name
-					else:
-						security_check = instrument_df[((instrument_df['SEM_CUSTOM_SYMBOL']==name)|(instrument_df['SEM_TRADING_SYMBOL']==name))]
-						if security_check.empty:
-							raise Exception("Check the Tradingsymbol")						
-						security_id = security_check.iloc[-1]['SEM_SMST_SECURITY_ID']
-						nfo_check = ['NSE_FNO' for nfo in NFO if nfo in name]
-						bfo_check = ['BSE_FNO' for bfo in BFO if bfo in name]
-						exchange_nfo ='NSE_FNO' if len(nfo_check)!=0 else False
-						exchange_bfo = 'BSE_FNO' if len(bfo_check)!=0 else False
-						if not exchange_nfo and not exchange_bfo:
-							eq_check =['NSE_FNO' for nfo in equity if nfo in name]
-							exchange_eq ='NSE_FNO' if len(eq_check)!=0 else "NSE_EQ"
-						else:
-							exchange_eq="NSE_EQ"
-						exchange ='NSE_FNO' if exchange_nfo else ('BSE_FNO' if exchange_bfo else exchange_eq)
-						trail_exchange = exchange
-						mcx_check = ['MCX_COMM' for mcx in self.commodity_step_dict.keys() if mcx in name]
-						exchange = "MCX_COMM" if len(mcx_check)!=0 else exchange
-						if exchange == "MCX_COMM": 
-							if instrument_df[((instrument_df['SEM_CUSTOM_SYMBOL']==name)|(instrument_df['SEM_TRADING_SYMBOL']==name))&(instrument_df['SEM_EXM_EXCH_ID']=='MCX')].empty:
-								exchange = trail_exchange
-						if exchange == "MCX_COMM":
-							security_check = instrument_df[((instrument_df['SEM_CUSTOM_SYMBOL']==name)|(instrument_df['SEM_TRADING_SYMBOL']==name))&(instrument_df['SEM_EXM_EXCH_ID']=='MCX')]
-							if security_check.empty:
-								raise Exception("Check the Tradingsymbol")	
-							security_id = security_check.iloc[-1]['SEM_SMST_SECURITY_ID']
-						instruments[exchange].append(int(security_id))
-						instrument_names[str(security_id)]=name
-				except Exception as e:
-					print(f"Exception for instrument name {name} as {e}")
-					continue
-			time.sleep(2)
-			data = self.Dhan.ticker_data(instruments)
-			ltp_data=dict()
-			
-			if debug.upper()=="YES":
-				print(data)			
-
-			if data['status']!='failure':
-				all_values = data['data']['data']
-				for exchange in data['data']['data']:
-					for key, values in all_values[exchange].items():
-						symbol = instrument_names[key]
-						ltp_data[symbol] = values['last_price']
-			else:
-				raise Exception(data)
-			
-			return ltp_data
-		except Exception as e:
-			print(f"Exception at calling ltp as {e}")
-			self.logger.exception(f"Exception at calling ltp as {e}")
-			return dict()
-	
-	
 	def ltp_call(self,instruments):
 		try:
 			url = "https://api.dhan.co/v2/marketfeed/ltp"
@@ -686,6 +642,7 @@ class Tradehull:
 
 	def ATM_Strike_Selection(self, Underlying, Expiry):
 		try:
+
 			Underlying = Underlying.upper()
 			strike = 0
 			exchange_index = {"BANKNIFTY": "NSE","NIFTY":"NSE","MIDCPNIFTY":"NSE", "FINNIFTY":"NSE","SENSEX":"BSE","BANKEX":"BSE"}
@@ -718,16 +675,19 @@ class Tradehull:
 
 			ltp_data = self.get_ltp_data(Underlying)
 			ltp = ltp_data[Underlying]
+			
 			if Underlying in self.index_step_dict:
-				step = self.index_step_dict[Underlying]
+				step_size = self.index_step_dict[Underlying]
+
 			elif Underlying in self.stock_step_df:
-				step = self.stock_step_df[Underlying]
+				step_size = self.stock_step_df[Underlying]
+
 			elif Underlying in self.commodity_step_dict:
-				step = self.commodity_step_dict[Underlying]
+				step_size = self.commodity_step_dict[Underlying]
 			else:
-				data = f'{Underlying} Not in the step list'
+				data = f'{Underlying} Not in the step_size list'
 				raise Exception(data)
-			strike = round(ltp/step) * step
+			strike = round(ltp/step_size) * step_size
 			
 			if Underlying in self.index_step_dict:
 				ce_condition = (instrument_df['SEM_EXM_EXCH_ID'] == exchange) & ((instrument_df['SEM_TRADING_SYMBOL'].str.startswith(Underlying))|(instrument_df['SEM_CUSTOM_SYMBOL'].str.startswith(Underlying))) & (instrument_df['ContractExpiration'] == Expiry_date) & (instrument_df['SEM_OPTION_TYPE']=='CE') 
@@ -739,7 +699,7 @@ class Tradehull:
 				ce_condition = (instrument_df['SEM_EXM_EXCH_ID'] == exchange) & ((instrument_df['SEM_TRADING_SYMBOL'].str.startswith(Underlying + '-'))&(instrument_df['SEM_CUSTOM_SYMBOL'].str.startswith(Underlying))) & (instrument_df['ContractExpiration'] == Expiry_date) & (instrument_df['SEM_OPTION_TYPE']=='CE')
 				pe_condition = (instrument_df['SEM_EXM_EXCH_ID'] == exchange) & ((instrument_df['SEM_TRADING_SYMBOL'].str.startswith(Underlying + '-'))&(instrument_df['SEM_CUSTOM_SYMBOL'].str.startswith(Underlying))) & (instrument_df['ContractExpiration'] == Expiry_date) & (instrument_df['SEM_OPTION_TYPE']=='PE')
 			else:
-				data = f'{Underlying} Not in the step list'
+				data = f'{Underlying} Not in the step_size list'
 				raise Exception(data)
 
 			ce_df = instrument_df[ce_condition].copy()
@@ -748,11 +708,12 @@ class Tradehull:
 			if ce_df.empty or pe_df.empty:
 				raise Exception(f"Unable to find the ATM strike for the {Underlying}")
 
-			ce_df['SEM_STRIKE_PRICE'] = ce_df['SEM_STRIKE_PRICE'].astype("int")
-			pe_df['SEM_STRIKE_PRICE'] = pe_df['SEM_STRIKE_PRICE'].astype("int")
+			ce_df['SEM_STRIKE_PRICE'] = ce_df['SEM_STRIKE_PRICE'].astype("float")
+			pe_df['SEM_STRIKE_PRICE'] = pe_df['SEM_STRIKE_PRICE'].astype("float")
 
-			ce_df =ce_df[ce_df['SEM_STRIKE_PRICE']==strike]
-			pe_df =pe_df[pe_df['SEM_STRIKE_PRICE']==strike]
+			ce_df =ce_df[ce_df['SEM_STRIKE_PRICE']==float(strike)]
+			pe_df =pe_df[pe_df['SEM_STRIKE_PRICE']==float(strike)]
+
 
 			if ce_df.empty or pe_df.empty:
 				raise Exception(f"Unable to find the ATM strike for the {Underlying}")			
@@ -824,25 +785,27 @@ class Tradehull:
 	
 			ltp_data = self.get_ltp_data(Underlying)
 			ltp = ltp_data[Underlying]
-			if Underlying in self.index_step_dict:
-				step = self.index_step_dict[Underlying]
-			elif Underlying in self.stock_step_df:
-				step = self.stock_step_df[Underlying]
-			elif Underlying in self.commodity_step_dict:
-				step = self.commodity_step_dict[Underlying]
-			else:
-				data = f'{Underlying} Not in the step list'
-				raise Exception(data)
-			strike = round(ltp/step) * step
 			
+			if Underlying in self.index_step_dict:
+				step_size = self.index_step_dict[Underlying]
+
+			elif Underlying in self.stock_step_df:
+				step_size = self.stock_step_df[Underlying]
+
+			elif Underlying in self.commodity_step_dict:
+				step_size = self.commodity_step_dict[Underlying]
+			else:
+				data = f'{Underlying} Not in the step_size list'
+				raise Exception(data)
+			strike = round(ltp/step_size) * step_size
 
 			if OTM_count<1:
 				return "INVALID OTM DISTANCE"
 
-			step = int(OTM_count*step)
+			step_size = float(OTM_count*step_size)
 
-			ce_OTM_price = strike+step
-			pe_OTM_price = strike-step
+			ce_OTM_price = strike+step_size
+			pe_OTM_price = strike-step_size
 
 			if Underlying in self.index_step_dict:
 				ce_condition = (instrument_df['SEM_EXM_EXCH_ID'] == exchange) & ((instrument_df['SEM_TRADING_SYMBOL'].str.startswith(Underlying))|(instrument_df['SEM_CUSTOM_SYMBOL'].str.startswith(Underlying))) & (instrument_df['ContractExpiration'] == Expiry_date) & (instrument_df['SEM_OPTION_TYPE']=='CE') 
@@ -854,7 +817,7 @@ class Tradehull:
 				ce_condition = (instrument_df['SEM_EXM_EXCH_ID'] == exchange) & ((instrument_df['SEM_TRADING_SYMBOL'].str.startswith(Underlying + '-'))&(instrument_df['SEM_CUSTOM_SYMBOL'].str.startswith(Underlying))) & (instrument_df['ContractExpiration'] == Expiry_date) & (instrument_df['SEM_OPTION_TYPE']=='CE')
 				pe_condition = (instrument_df['SEM_EXM_EXCH_ID'] == exchange) & ((instrument_df['SEM_TRADING_SYMBOL'].str.startswith(Underlying + '-'))&(instrument_df['SEM_CUSTOM_SYMBOL'].str.startswith(Underlying))) & (instrument_df['ContractExpiration'] == Expiry_date) & (instrument_df['SEM_OPTION_TYPE']=='PE')		
 			else:
-				data = f'{Underlying} Not in the step list'
+				data = f'{Underlying} Not in the step_size list'
 				raise Exception(data)				 			
 			
 			ce_df = instrument_df[ce_condition].copy()
@@ -863,14 +826,14 @@ class Tradehull:
 			if ce_df.empty or pe_df.empty:
 				raise Exception(f"Unable to find the OTM strike for the {Underlying}")			
 
-			ce_df['SEM_STRIKE_PRICE'] = ce_df['SEM_STRIKE_PRICE'].astype("int")
-			pe_df['SEM_STRIKE_PRICE'] = pe_df['SEM_STRIKE_PRICE'].astype("int")
+			ce_df['SEM_STRIKE_PRICE'] = ce_df['SEM_STRIKE_PRICE'].astype("float")
+			pe_df['SEM_STRIKE_PRICE'] = pe_df['SEM_STRIKE_PRICE'].astype("float")
 
-			ce_df =ce_df[ce_df['SEM_STRIKE_PRICE']==ce_OTM_price]
-			pe_df =pe_df[pe_df['SEM_STRIKE_PRICE']==pe_OTM_price]
+			ce_df =ce_df[ce_df['SEM_STRIKE_PRICE']==float(ce_OTM_price)]
+			pe_df =pe_df[pe_df['SEM_STRIKE_PRICE']==float(pe_OTM_price)]
 
 			if ce_df.empty or pe_df.empty:
-				raise Exception(f"Unable to find the ITM strike for the {Underlying}")			
+				raise Exception(f"Unable to find the OTM strike for the {Underlying}")			
 
 			if ce_df.empty or len(ce_df)==0:
 				ce_df['diff'] = abs(ce_df['SEM_STRIKE_PRICE'] - ce_OTM_price)
@@ -940,23 +903,26 @@ class Tradehull:
 	
 			ltp_data = self.get_ltp_data(Underlying)
 			ltp = ltp_data[Underlying]
+			
 			if Underlying in self.index_step_dict:
-				step = self.index_step_dict[Underlying]
+				step_size = self.index_step_dict[Underlying]
+
 			elif Underlying in self.stock_step_df:
-				step = self.stock_step_df[Underlying]
+				step_size = self.stock_step_df[Underlying]
+
 			elif Underlying in self.commodity_step_dict:
-				step = self.commodity_step_dict[Underlying]
+				step_size = self.commodity_step_dict[Underlying]
 			else:
-				data = f'{Underlying} Not in the step list'
+				data = f'{Underlying} Not in the step_size list'
 				raise Exception(data)
-			strike = round(ltp/step) * step
+			strike = round(ltp/step_size) * step_size
 
 			if ITM_count<1:
 				return "INVALID ITM DISTANCE"
 			
-			step = int(ITM_count*step)
-			ce_ITM_price = strike-step
-			pe_ITM_price = strike+step
+			step_size = float(ITM_count*step_size)
+			ce_ITM_price = strike-step_size
+			pe_ITM_price = strike+step_size
 
 			if Underlying in self.index_step_dict:
 				ce_condition = (instrument_df['SEM_EXM_EXCH_ID'] == exchange) & ((instrument_df['SEM_TRADING_SYMBOL'].str.startswith(Underlying))|(instrument_df['SEM_CUSTOM_SYMBOL'].str.startswith(Underlying))) & (instrument_df['ContractExpiration'] == Expiry_date) & (instrument_df['SEM_OPTION_TYPE']=='CE') 
@@ -968,7 +934,7 @@ class Tradehull:
 				ce_condition = (instrument_df['SEM_EXM_EXCH_ID'] == exchange) & ((instrument_df['SEM_TRADING_SYMBOL'].str.startswith(Underlying + '-'))&(instrument_df['SEM_CUSTOM_SYMBOL'].str.startswith(Underlying))) & (instrument_df['ContractExpiration'] == Expiry_date) & (instrument_df['SEM_OPTION_TYPE']=='CE')
 				pe_condition = (instrument_df['SEM_EXM_EXCH_ID'] == exchange) & ((instrument_df['SEM_TRADING_SYMBOL'].str.startswith(Underlying + '-'))&(instrument_df['SEM_CUSTOM_SYMBOL'].str.startswith(Underlying))) & (instrument_df['ContractExpiration'] == Expiry_date) & (instrument_df['SEM_OPTION_TYPE']=='PE')
 			else:
-				data = f'{Underlying} Not in the step list'
+				data = f'{Underlying} Not in the step_size list'
 				raise Exception(data)			
 			 			
 			ce_df = instrument_df[ce_condition].copy()
@@ -977,11 +943,11 @@ class Tradehull:
 			if ce_df.empty or pe_df.empty:
 				raise Exception(f"Unable to find the ITM strike for the {Underlying}")			
 
-			ce_df['SEM_STRIKE_PRICE'] = ce_df['SEM_STRIKE_PRICE'].astype("int")
-			pe_df['SEM_STRIKE_PRICE'] = pe_df['SEM_STRIKE_PRICE'].astype("int")
+			ce_df['SEM_STRIKE_PRICE'] = ce_df['SEM_STRIKE_PRICE'].astype("float")
+			pe_df['SEM_STRIKE_PRICE'] = pe_df['SEM_STRIKE_PRICE'].astype("float")
 
-			ce_df =ce_df[ce_df['SEM_STRIKE_PRICE']==ce_ITM_price].copy()
-			pe_df =pe_df[pe_df['SEM_STRIKE_PRICE']==pe_ITM_price]
+			ce_df =ce_df[ce_df['SEM_STRIKE_PRICE']==float(ce_ITM_price)]
+			pe_df =pe_df[pe_df['SEM_STRIKE_PRICE']==float(pe_ITM_price)]
 
 			if ce_df.empty or pe_df.empty:
 				raise Exception(f"Unable to find the ITM strike for the {Underlying}")
@@ -1451,7 +1417,6 @@ class Tradehull:
 				Expiry_date = expiry_list[expiry]                       
 
 			# time.sleep(3)
-			pdb.set_trace()
 			response = self.Dhan.option_chain(under_security_id =int(security_id), under_exchange_segment = exchange_segment, expiry = Expiry_date)
 			if response['status']=='success':
 				oc = response['data']['data']
@@ -1464,6 +1429,8 @@ class Tradehull:
 					strike_step = self.index_step_dict[Underlying]
 				elif Underlying in self.stock_step_df:
 					strike_step = self.stock_step_df[Underlying]
+				elif Underlying in self.commodity_step_dict:
+					strike_step = self.commodity_step_dict[Underlying]
 				else:
 					raise Exception(f"No option chain data available for the {Underlying}")
 				# atm_strike = oc_df.loc[(oc_df['Strike Price'] - atm_price[Underlying]).abs().idxmin(), 'Strike Price']
@@ -1664,7 +1631,7 @@ class Tradehull:
 					continue
 			time.sleep(2)
 			data = self.Dhan.quote_data(instruments)
-                        
+						
 			ltp_data=dict()
 			
 			if debug.upper()=="YES":
@@ -1748,7 +1715,7 @@ class Tradehull:
 					continue
 			time.sleep(2)
 			data = self.Dhan.ohlc_data(instruments)
-                        
+						
 			ltp_data=dict()
 			
 			if debug.upper()=="YES":
@@ -1858,3 +1825,478 @@ class Tradehull:
 				})
 
 		return pd.DataFrame(renko_data)
+
+	# Long Term Historical Data
+	def get_long_term_historical_data(self, tradingsymbol, exchange, timeframe, from_date, to_date, sector = "NO", debug="NO"):
+		"""
+		Fetch historical data from Dhan between custom date range (supports DAY and intraday timeframes).
+		
+		Parameters:
+			tradingsymbol (str): Trading symbol (e.g., "RELIANCE")
+			exchange (str): Exchange name (e.g., "NSE")
+			timeframe (str): One of ['1', '5', '15', '25', '60', 'DAY']
+			from_date (str or datetime.date): Start date (e.g., '2022-01-01')
+			to_date (str or datetime.date): End date (e.g., '2024-12-31')
+			debug (str): If "YES", prints chunk info
+			
+		Returns:
+			pd.DataFrame: Combined OHLCV data
+		"""
+		try:
+			# tradingsymbol = tradingsymbol.upper()
+			exchange = exchange.upper()
+			instrument_df = self.instrument_df.copy()
+
+			if isinstance(from_date, str):
+				from_date = datetime.datetime.strptime(from_date, "%Y-%m-%d").date()
+			if isinstance(to_date, str):
+				to_date = datetime.datetime.strptime(to_date, "%Y-%m-%d").date()
+			max_start_date = datetime.datetime.now().date() - datetime.timedelta(days=5 * 365)
+			if from_date < max_start_date:
+				print(f"Warning: from_date{from_date} exceeds Dhan's 5-year limit. Resetting to {max_start_date}")
+				from_date = max_start_date
+
+			if from_date > to_date:
+				raise ValueError("from_date must be earlier than to_date")
+
+			script_exchange = {
+				"NSE": self.Dhan.NSE,
+				"NFO": self.Dhan.NSE_FNO,
+				"BFO": self.Dhan.BSE_FNO,
+				"CUR": self.Dhan.CUR,
+				"BSE": self.Dhan.BSE,
+				"MCX": self.Dhan.MCX,
+				"INDEX": self.Dhan.INDEX
+			}
+			instrument_exchange = {'NSE': "NSE", 'BSE': "BSE", 'NFO': 'NSE', 'BFO': 'BSE', 'MCX': 'MCX', 'CUR': 'NSE'}
+			index_exchange = {"NIFTY": 'NSE', "BANKNIFTY": "NSE", "FINNIFTY": "NSE", "MIDCPNIFTY": "NSE", "BANKEX": "BSE", "SENSEX": "BSE"}
+			exchange_segment = script_exchange[exchange]
+
+			if tradingsymbol in index_exchange:
+				exchange = index_exchange[tradingsymbol]
+
+			if sector.upper()=="YES":
+				security_check = instrument_df[((instrument_df['SEM_TRADING_SYMBOL']==tradingsymbol)|(instrument_df['SEM_CUSTOM_SYMBOL']==tradingsymbol))&(instrument_df['SEM_EXM_EXCH_ID']==exchange)]
+				if security_check.empty:
+					raise Exception("Check the Tradingsymbol or Exchange")
+				security_id = security_check.iloc[-1]['SEM_SMST_SECURITY_ID']
+				exchange_segment = "IDX_I"
+			if tradingsymbol in self.commodity_step_dict.keys():
+				security_check = instrument_df[
+					(instrument_df['SEM_EXM_EXCH_ID'] == 'MCX') &
+					(instrument_df['SM_SYMBOL_NAME'] == tradingsymbol.upper()) &
+					(instrument_df['SEM_INSTRUMENT_NAME'] == 'FUTCOM')
+				]
+				if security_check.empty:
+					raise Exception("Invalid symbol or exchange for commodity")
+				security_id = security_check.sort_values(by='SEM_EXPIRY_DATE').iloc[0]['SEM_SMST_SECURITY_ID']
+				tradingsymbol = security_check.sort_values(by='SEM_EXPIRY_DATE').iloc[0]['SEM_CUSTOM_SYMBOL']
+			else:
+				security_check = instrument_df[
+					((instrument_df['SEM_TRADING_SYMBOL'] == tradingsymbol) |
+					(instrument_df['SEM_CUSTOM_SYMBOL'] == tradingsymbol)) &
+					(instrument_df['SEM_EXM_EXCH_ID'] == instrument_exchange[exchange])
+				]
+				if security_check.empty:
+					raise Exception("Invalid symbol or exchange")
+				security_id = security_check.iloc[-1]['SEM_SMST_SECURITY_ID']
+
+			instrument_type = security_check.iloc[-1]['SEM_INSTRUMENT_NAME']
+			expiry_code = security_check.iloc[-1]['SEM_EXPIRY_CODE']
+			# step_size: Use DAY data to find instrument's actual start date
+			sample_from = max_start_date
+			sample_to = datetime.datetime.now().date()
+
+			# Fetch 90-day daily data to infer listing/start date
+			day_data = self.Dhan.historical_daily_data(int(security_id), exchange_segment, instrument_type,sample_from.strftime('%Y-%m-%d'), sample_to.strftime('%Y-%m-%d'), int(expiry_code))
+
+			if day_data['status'] != 'failure':
+				df_day = pd.DataFrame(day_data['data'])
+				if not df_day.empty:
+					df_day['timestamp'] = df_day['timestamp'].apply(lambda x: self.convert_to_date_time(x))
+					earliest_day_date = df_day['timestamp'].min()
+
+					if from_date < earliest_day_date:
+						print(f"Adjusting from_date from {from_date} to {earliest_day_date} based on available data")
+						from_date = earliest_day_date
+				else:
+					raise Exception("No DAY data found in test range.")
+			else:
+				raise Exception(f"Failed to retrieve DAY timeframe data: {day_data}")
+
+			if timeframe in ['1', '5', '15', '25', '60']:
+				interval = int(timeframe)
+				is_intraday = True
+			elif timeframe.upper() == "DAY":
+				is_intraday = False
+			else:
+				raise Exception("interval must be one of ['1','5','15','25','60','DAY']")
+
+			step_days = 90
+			all_data = []
+
+			current_from = from_date
+			print(f"Fetching data for {tradingsymbol} from {from_date} to {to_date}")
+			while current_from <= to_date:
+				current_to = min(current_from + datetime.timedelta(days=step_days - 1), to_date)
+				from_str = current_from.strftime('%Y-%m-%d')
+				to_str = current_to.strftime('%Y-%m-%d')
+				print(f"Fetching data for {tradingsymbol} from {from_str} to {to_str}")
+				time.sleep(0.3)
+
+				if is_intraday:
+					response = self.Dhan.intraday_minute_data(
+						str(security_id), exchange_segment, instrument_type,
+						from_str, to_str, interval)
+				else:
+					response = self.Dhan.historical_daily_data(
+						int(security_id), exchange_segment, instrument_type,
+						from_str, to_str, int(expiry_code)
+					)
+
+				if response['status'] != 'failure':
+					df = pd.DataFrame(response['data'])
+					if not df.empty:
+						df['timestamp'] = df['timestamp'].apply(lambda x: self.convert_to_date_time(x))
+						all_data.append(df)
+						if debug.upper() == "YES":
+							print(f"{tradingsymbol} [{from_str} to {to_str}] {len(df)} rows")
+				else:
+					print(f"Failed: {from_str} to {to_str}: {response}")
+
+				current_from = current_to + datetime.timedelta(days=1)
+			return pd.concat(all_data).reset_index(drop=True) if all_data else pd.DataFrame()
+
+		except Exception as e:
+			print(f"Exception: {e}")
+			self.logger.exception(f"Custom range fetch failed: {e}")
+			return pd.DataFrame()
+
+
+	# 20 Market Depth Data
+	def get_market_depth_client(self, tradingsymbol: str, exchange: str, debug: str = "NO"):
+		
+		try:
+			tradingsymbol = tradingsymbol.upper()
+			exchange      = exchange.upper()
+			instrument_df = self.instrument_df.copy()
+			instrument_exchange = {
+				'NSE': "NSE",
+				'BSE': "BSE",
+				'NFO': "NSE",
+				'BFO': "BSE",
+			}
+
+			if exchange not in instrument_exchange:
+				raise Exception(f"Unsupported exchange '{exchange}'. Use one of ['NSE','BSE','NFO','BFO'].")
+
+			security_check = instrument_df[((instrument_df['SEM_TRADING_SYMBOL'] == tradingsymbol) | (instrument_df['SEM_CUSTOM_SYMBOL']  == tradingsymbol)) & (instrument_df['SEM_EXM_EXCH_ID'] == instrument_exchange[exchange])]
+			if security_check.empty:
+				raise Exception("Check the Tradingsymbol or Exchange.")
+			security_id = security_check.iloc[-1]['SEM_SMST_SECURITY_ID']
+			security_id = str(security_id)
+			segment_code_map = {
+				'NSE':  1,   # NSE_EQ
+				'NFO':  2,   # NSE_FNO
+				'BSE':  11,  # BSE_EQ
+				'BFO':  12,  # BSE_FNO
+			}
+
+			exchange_code = segment_code_map[exchange]
+
+			if not hasattr(self, "dhan_context") or self.dhan_context is None:
+				self.dhan_context = DhanContext(self.ClientCode, self.token_id)
+
+			instruments = [(exchange_code, security_id)]
+
+			if debug.upper() == "YES":
+				print(f"[MarketDepth] tradingsymbol={tradingsymbol}, exchange={exchange}, "
+					  f"exchange_code={exchange_code}, security_id={security_id}")
+				print(f"[MarketDepth] instruments payload: {instruments}")
+
+			depth_client = FullDepth(self.dhan_context, instruments)
+
+			return depth_client, exchange_code, security_id
+
+		except Exception as e:
+			print(f"Exception in get_market_depth_client: {e}")
+			self.logger.exception(f"Exception in get_market_depth_client as {e}")
+			return None, None, None
+		
+
+	def start_market_depth(self, tradingsymbol, exchange, debug="NO"):
+		depth_client, exch_code, sec_id = self.get_market_depth_client(tradingsymbol, exchange, debug)
+
+		if depth_client is None:
+			return None, None, None
+
+		t = threading.Thread(target=depth_client.run_forever, daemon=True)
+		t.start()
+		while depth_client.ws is None:
+			print("Waiting for FullDepth WebSocket to connect...")
+			time.sleep(0.2)
+
+		print(f"[MarketDepth] Started streaming for {tradingsymbol}")
+
+		return depth_client, exch_code, sec_id
+	
+	def get_market_depth_df(self, depth_client, debug: str = "NO") -> pd.DataFrame:
+		
+		try:
+			buffer = io.StringIO()
+			old_stdout = sys.stdout
+			sys.stdout = buffer
+			try:
+				depth_client.get_data()
+			finally:
+				sys.stdout = old_stdout
+
+			text = buffer.getvalue()
+
+			if debug.upper() == "YES":
+				print("----- Captured FullDepth output -----")
+				print(text)
+				print("----- End Captured output -----")
+
+			
+			pattern = re.compile(
+				r"bid\s*:\s*{price:(?P<bid_price>-?\d+\.?\d*),\s*quantity:(?P<bid_qty>\d+),\s*no_of_orders:(?P<bid_orders>\d+)}\s*\|\s*"
+				r"ask\s*:\s*{price:(?P<ask_price>-?\d+\.?\d*),\s*quantity:(?P<ask_qty>\d+),\s*no_of_orders:(?P<ask_orders>\d+)}")
+
+			rows = []
+			level = 1
+			for line in text.splitlines():
+				m = pattern.search(line)
+				if not m:
+					continue
+				rows.append({
+					"level": level,
+					"bid_price": float(m.group("bid_price")),
+					"bid_qty": int(m.group("bid_qty")),
+					"bid_orders": int(m.group("bid_orders")),
+					"ask_price": float(m.group("ask_price")),
+					"ask_qty": int(m.group("ask_qty")),
+					"ask_orders": int(m.group("ask_orders")),
+				})
+				level += 1
+
+			if rows:
+
+				df = pd.DataFrame(rows)
+
+				bid_df = df[['level', 'bid_price', 'bid_qty', 'bid_orders']].copy()
+				bid_df.set_index('level', inplace=True)
+				
+				ask_df = df[['level', 'ask_price', 'ask_qty', 'ask_orders']].copy()
+				ask_df.set_index('level', inplace=True)
+				
+				return bid_df, ask_df
+
+		except Exception as e:
+			print(f"Exception in get_market_depth_df: {e}")
+			self.logger.exception(f"Exception in get_market_depth_df as {e}")
+			return pd.DataFrame(), pd.DataFrame()
+
+
+	def full_market_depth_data(self, symbols, debug="NO"):
+		depth_clients = OrderedDict()
+		norm_list = []
+
+		if isinstance(symbols, tuple) and len(symbols) == 2:
+			norm_list = [(symbols[0], symbols[1])]
+
+		elif isinstance(symbols, list):
+			for item in symbols:
+				if isinstance(item, tuple) and len(item) == 2:
+					norm_list.append((item[0], item[1]))
+				else:
+					raise Exception(f"symbols must be tuple(symbol,exchange) or list of such tuples. Example: [('RELIANCE','NSE'), ('NIFTY DEC 26000 CALL','NFO')]")
+
+		else:
+			raise Exception("symbols must be tuple(symbol,exchange) or list of such tuples. Example: [('RELIANCE','NSE'), ('NIFTY DEC 26000 CALL','NFO')]")
+
+		for sym, exch in norm_list:
+			sym_u = sym.upper()
+			exch_u = exch.upper()
+
+			depth_client, exch_code, sec_id = self.start_market_depth(sym_u, exch_u, debug)
+
+
+			if depth_client is None:
+				print(f"Failed to start depth for {sym_u} ({exch_u})")
+				continue
+
+			key = f"{sym_u}|{exch_u}"
+			depth_clients[key] = depth_client
+
+			print(f"Depth streaming started for {key} (sec_id={sec_id})")
+
+		return depth_clients
+
+	
+	def convert_to_df(self, response):
+		try:
+			data = response.get("data", {}).get("data", {})
+			ce = data.get("ce")
+			pe = data.get("pe")
+
+			def _df(x):
+				df = pd.DataFrame({
+					"timestamp": x.get("timestamp", []),
+					"open": x.get("open", []),
+					"high": x.get("high", []),
+					"low": x.get("low", []),
+					"close": x.get("close", []),
+					"volume": x.get("volume", []),
+					"iv": x.get("iv", []),
+					"oi": x.get("oi", []),
+					"spot": x.get("spot", []),
+					"strike": x.get("strike", [])
+				})
+				df["datetime"] = df["timestamp"].apply(lambda t: datetime.datetime.utcfromtimestamp(t) + datetime.timedelta(hours=5, minutes=30))
+				return df[["datetime","open","high","low","close","volume","iv","oi","spot","strike"]]
+
+			if ce and not pe:
+				return _df(ce)
+			if pe and not ce:
+				return _df(pe)
+			if ce and pe:
+				return {"CE": _df(ce), "PE": _df(pe)}
+			return pd.DataFrame()
+
+		except:
+			return pd.DataFrame()
+
+
+	def get_expired_option_data( self, tradingsymbol: str, exchange: str, interval: int, expiry_flag: str, expiry_code: int, strike: str = "ATM", option_type: str = "CALL", required_data=None, from_date: str = "", to_date: str = ""):
+		try:
+			tradingsymbol = tradingsymbol.upper()
+			exchange = exchange.upper()
+			instrument_df = self.instrument_df.copy()
+
+			if required_data is None:
+				required_data = ["open", "high", "low", "close", "volume", "iv", "oi", "spot", "strike"]
+
+			if not hasattr(self, "dhan_context") or self.dhan_context is None:
+				self.dhan_context = DhanContext(self.ClientCode, self.token_id)
+
+			dhan_http = self.dhan_context.get_dhan_http()
+
+			script_exchange = {
+				"NSE": self.Dhan.NSE,
+				"NFO": self.Dhan.NSE_FNO,
+				"BFO": self.Dhan.BSE_FNO,
+				"BSE": self.Dhan.BSE,
+				"INDEX": self.Dhan.INDEX
+			}
+
+			instrument_exchange = {
+				"NSE": "NSE",
+				"BSE": "BSE",
+				"NFO": "NSE",
+				"BFO": "BSE",
+			}
+
+			exchange_segment = script_exchange[exchange]
+
+			index_exchange = {
+				"NIFTY": "NSE",
+				"BANKNIFTY": "NSE",
+				"FINNIFTY": "NSE",
+				"MIDCPNIFTY": "NSE",
+				"BANKEX": "BSE",
+				"SENSEX": "BSE"
+			}
+
+			if tradingsymbol in index_exchange:
+				exchange = index_exchange[tradingsymbol]
+
+			
+			security_check = instrument_df[
+				((instrument_df['SEM_TRADING_SYMBOL'] == tradingsymbol) |
+				(instrument_df['SEM_CUSTOM_SYMBOL'] == tradingsymbol)) &
+				(instrument_df['SEM_EXM_EXCH_ID'] == instrument_exchange[exchange])
+			]
+			if security_check.empty:
+				raise Exception("Check the Tradingsymbol or Exchange")
+			security_id = security_check.iloc[-1]['SEM_SMST_SECURITY_ID']
+
+			if tradingsymbol in index_exchange:
+				instrument_type = "OPTIDX"
+			else:
+				instrument_type = "OPTSTK"
+
+			if exchange == "NSE":
+				exchange_segment = "NSE_FNO"
+			elif exchange == "BSE":
+				exchange_segment = "BSE_FNO"
+
+			payload = {
+				"exchangeSegment": exchange_segment,
+				"securityId": int(security_id),
+				"instrument": instrument_type,
+				"interval": int(interval),
+				"expiryFlag": expiry_flag,
+				"expiryCode": expiry_code,
+				"strike": strike,
+				"drvOptionType": option_type,
+				"requiredData": required_data,
+				"fromDate": from_date,
+				"toDate": to_date
+			}
+
+			response = dhan_http.post("/charts/rollingoption", payload)
+			df = self.convert_to_df(response)
+			return df
+
+		except Exception as e:
+			print(f"Exception in get_expired_option_data: {e}")
+			self.logger.exception(f"Exception in get_expired_option_data as {e}")
+			return None
+
+	def dhan_equity_step_creation(self) -> dict:
+		"""
+		Build step_size size dictionary for all stock option underlyings (OPTSTK)
+		using Dhan instrument file.
+		"""
+		try:
+			df = self.instrument_df.copy()
+			opt_df = df[(df["SEM_INSTRUMENT_NAME"] == "OPTSTK") & (df["SEM_OPTION_TYPE"] == "CE") & (df["SEM_EXM_EXCH_ID"] == "NSE")].copy()
+			opt_df["UNDERLYING"] = opt_df["SEM_TRADING_SYMBOL"].apply(lambda s: s.split("-")[0])
+
+			if opt_df.empty:
+				return {}
+
+			opt_df["SEM_STRIKE_PRICE"] = opt_df["SEM_STRIKE_PRICE"].astype(float)
+			step_dict = {}
+
+			for symbol, group in opt_df.groupby("UNDERLYING"):
+				try:
+					
+					group = group.sort_values("SEM_EXPIRY_DATE")
+
+					nearest_expiry = group["SEM_EXPIRY_DATE"].iloc[0]
+					g2 = group[group["SEM_EXPIRY_DATE"] == nearest_expiry]
+
+					if len(g2) < 2:
+						continue
+
+					strikes = np.sort(g2["SEM_STRIKE_PRICE"].values)
+
+					diffs = np.diff(strikes)
+					if len(diffs) == 0:
+						continue
+
+					step_size = Counter(diffs).most_common(1)[0][0]
+
+					step_size = int(step_size) if float(step_size).is_integer() else step_size
+
+					step_dict[symbol] = step_size
+
+				except Exception:
+					continue
+			return step_dict
+
+		except Exception as e:
+			print("Error in dhan_equity_step_creation:", e)
+			return {}
